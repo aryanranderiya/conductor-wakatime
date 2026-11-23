@@ -158,6 +158,8 @@ function parseContent(value) {
   }
 }
 
+const appHeartbeatCache = new Map();
+
 function buildHeartbeatsFromRow(row) {
   const content = parseContent(row.content);
   const messageContent = content && content.message && Array.isArray(content.message.content)
@@ -182,6 +184,19 @@ function buildHeartbeatsFromRow(row) {
       tool_name: item.name,
       file_path: filePath,
     }));
+  }
+
+  if (heartbeats.length === 0) {
+    const toolUse = messageContent.find((item) => item && item.type === "tool_use");
+
+    if (toolUse) {
+      heartbeats.push(buildHeartbeatFromRow({
+        ...row,
+        id: `${row.id}:app`,
+        tool_name: toolUse.name,
+        file_path: null,
+      }));
+    }
   }
 
   return heartbeats;
@@ -434,6 +449,16 @@ function trackOnce(options = {}) {
       const heartbeats = buildHeartbeatsFromRow(row);
 
       for (const heartbeat of heartbeats) {
+        if (heartbeat.entityType === "app") {
+          const previous = appHeartbeatCache.get(heartbeat.project) || 0;
+
+          if (heartbeat.time - previous < 120) {
+            continue;
+          }
+
+          appHeartbeatCache.set(heartbeat.project, heartbeat.time);
+        }
+
         if (heartbeat.entityType === "file" && !fs.existsSync(heartbeat.entity)) {
           skipped.push({ id: heartbeat.messageId, reason: "file no longer exists", entity: heartbeat.entity });
         } else {
@@ -642,6 +667,11 @@ async function run(argv) {
     case "track-once":
       trackOnceCommand();
       return;
+    case "backfill": {
+      const { runBackfill } = require("./backfill");
+      await runBackfill(argv.slice(1), resolvePaths());
+      return;
+    }
     case "watch":
       watch();
       return;
@@ -649,7 +679,7 @@ async function run(argv) {
       testHeartbeat();
       return;
     default:
-      console.log("Usage: conductor-wakatime <install|uninstall|status>");
+      console.log("Usage: conductor-wakatime <install|uninstall|status|backfill>");
   }
 }
 

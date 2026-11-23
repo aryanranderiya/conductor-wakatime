@@ -6,7 +6,7 @@ WakaTime tracking for Conductor agent sessions on macOS.
 
 - Tracks Conductor agent sessions in WakaTime
 - Sends file-level heartbeats for read/write tool activity
-- Sends app-level heartbeats when Conductor records activity without a file path
+- Sends app-level heartbeats for Bash and Agent turns, throttled to one per project per 2 minutes
 - Adds explicit language metadata for known file extensions
 - Runs in the background with a macOS LaunchAgent
 
@@ -36,6 +36,17 @@ conductor-wakatime install
 ```
 
 The install command checks for Conductor's database, WakaTime CLI, and WakaTime config before it creates and starts the macOS LaunchAgent.
+
+## Backfill
+
+Aggregate existing Conductor activity into WakaTime in bulk. One heartbeat per project per 2 minutes, posted 25 at a time.
+
+```bash
+conductor-wakatime backfill --days 30 --end-days 1
+conductor-wakatime backfill --days 7 --dry-run
+```
+
+`--dry-run` prints the heartbeat count without sending. `--end-days` excludes the most recent N days so a previous run is not duplicated.
 
 ## Manage
 
